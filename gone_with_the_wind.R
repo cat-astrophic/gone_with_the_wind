@@ -32,7 +32,7 @@ library(sf)
 
 # Project directory
 
-direc <- 'C:/Users/macary/Documents/renewable_migration/'
+direc <- 'D:/gone_with_the_wind/'
 
 # Reading in the facilities and RUC code data
 
