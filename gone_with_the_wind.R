@@ -553,7 +553,7 @@ for (i in 1:nrow(acs.data)) {
   
   print(i)
   tmp <- ruc %>% filter(FIPS == acs.data$FIPS[i])
-  hurb <- c(hurb, tmp$Urban[1])
+  hurb <- c(hurb, max(tmp$Urban[1], 0, na.rm = TRUE))
   
 }
 
