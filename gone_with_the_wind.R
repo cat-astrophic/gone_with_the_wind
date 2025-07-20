@@ -458,7 +458,7 @@ ggdid(sol_sdid22_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Fa
 ggdid(sol_sdid33_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -') + theme(plot.title = element_text(hjust = 0.5))
 ggdid(sol_sdid44_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -') + theme(plot.title = element_text(hjust = 0.5))
 
-# Running the staggered diff-in-diff for wind without additional controls
+# Running the staggered diff-in-diff for wind with additional controls
 
 wind_sdid11 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind.data)
 wind_sdid22 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind.data)
