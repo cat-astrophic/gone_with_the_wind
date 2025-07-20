@@ -542,6 +542,7 @@ leaflet(sol2) %>% addCircleMarkers(data = sol2$geometry, opacity = 1, radius = .
 # Prep for heterogeneity analyses across the urban-rural divide
 
 ruc <- ruc %>% filter(Attribute == 'RUCC_2023')
+ruc$Value <- as.integer(ruc$Value)
 ruc$Urban <- as.integer(ruc$Value <= 3)
 
 acs.data$FIPS <- as.integer(acs.data$GEOID)
