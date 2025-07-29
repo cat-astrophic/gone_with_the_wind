@@ -719,7 +719,7 @@ serrs <- round(serrs, 3)
 
 write.csv(atandt, paste0(direc, 'results/coefs.txt'), row.names = FALSE)
 write.csv(serrs, paste0(direc, 'results/serrs.txt'), row.names = FALSE)
-write.csv(serrs, paste0(direc, 'results/stars.txt'), row.names = FALSE)
+write.csv(stars, paste0(direc, 'results/stars.txt'), row.names = FALSE)
 
 # Creating a summary statistics figure
 
@@ -729,14 +729,171 @@ colnames(sums) <- c('Log Population', 'Treated: Solar', 'Treated x Post: Solar',
 
 datasummary_skim(sums, fmt = '%.3f')
 
-##################################### NOTES #####################################
+# Placebo testing
 
-# Callaway, Brantly and Pedro H.C. Sant'Anna.  "Difference-in-Differences with Multiple Time Periods." Journal of Econometrics, Vol. 225, No. 2, pp. 200-230, 2021. <https://doi.org/10.1016/j.jeconom.2020.12.001>, <https://arxiv.org/abs/1803.09015>
-# https://www.sciencedirect.com/science/article/abs/pii/S030440762030378X
+# (1) randomize treatment and timing together
 
-# https://www.journals.uchicago.edu/doi/abs/10.1086/230638?journalCode=ajs
-# https://www.researchgate.net/profile/Paul-Mazerolle/publication/227622791_Using_the_Correct_Statistical_Test_for_Equality_of_Regression_Coefficients/links/0c9605322187ba6c70000000/Using-the-Correct-Statistical-Test-for-Equality-of-Regression-Coefficients.pdf
+sol.data <- acs.data %>% filter(Sol_Treat_Time != 1) %>% filter(Year < 2023)
+wind.data <- acs.data %>% filter(Wind_Treat_Time != 1) %>% filter(Year < 2023)
 
-# https://scholar.google.com/scholar?start=10&q=do+people+actually+move+away+from+windmills&hl=en&as_sdt=0,47&as_ylo=2021
-# https://scholar.google.com/citations?user=y6oSj2QAAAAJ&hl=en&oi=sra
+sol.data <- sol.data %>% filter(!is.na(Sol_Treat_Time)) %>% filter(!is.na(LogPop)) %>% filter(!is.na(LogLag)) %>% filter(!is.na(Income)) %>% filter(!is.na(Unemployment)) %>% filter(!is.na(HS)) %>% filter(!is.na(BS))
+wind.data <- wind.data %>% filter(!is.na(Wind_Treat_Time)) %>% filter(!is.na(LogPop)) %>% filter(!is.na(LogLag)) %>% filter(!is.na(Income)) %>% filter(!is.na(Unemployment)) %>% filter(!is.na(HS)) %>% filter(!is.na(BS))
+
+set.seed(7734)
+
+s_ids <- sample(nrow(sol.data))
+w_ids <- sample(nrow(wind.data))
+
+sol.data$Sol_Treat_Time_P <- sol.data$Sol_Treat_Time[s_ids]
+wind.data$Wind_Treat_Time_P <- wind.data$Wind_Treat_Time[w_ids]
+
+# Running the staggered diff-in-diff for solar with additional controls
+
+sol_sdid1p1 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time_P', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = sol.data)
+sol_sdid2p1 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time_P', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = sol.data)
+sol_sdid3p1 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time_P', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = sol.data)
+sol_sdid4p1 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time_P', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = sol.data)
+
+sol_sdid1p1_cs <- aggte(sol_sdid1p1, type = 'dynamic')
+sol_sdid2p1_cs <- aggte(sol_sdid2p1, type = 'dynamic')
+sol_sdid3p1_cs <- aggte(sol_sdid3p1, type = 'dynamic')
+sol_sdid4p1_cs <- aggte(sol_sdid4p1, type = 'dynamic')
+
+# Viewing results
+
+summary(sol_sdid1p1_cs)
+summary(sol_sdid2p1_cs)
+summary(sol_sdid3p1_cs)
+summary(sol_sdid4p1_cs)
+
+ggdid(sol_sdid1p1_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -\n\n- Placebo Test -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(sol_sdid2p1_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -\n\n- Placebo Test -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(sol_sdid3p1_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -\n\n- Placebo Test -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(sol_sdid4p1_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -\n\n- Placebo Test -') + theme(plot.title = element_text(hjust = 0.5))
+
+# Running the staggered diff-in-diff for wind with additional controls
+
+wind_sdid1p1 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time_P', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind.data)
+wind_sdid2p1 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time_P', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind.data)
+wind_sdid3p1 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time_P', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind.data)
+wind_sdid4p1 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time_P', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind.data)
+
+wind_sdid1p1_cs <- aggte(wind_sdid1p1, type = 'dynamic')
+wind_sdid2p1_cs <- aggte(wind_sdid2p1, type = 'dynamic')
+wind_sdid3p1_cs <- aggte(wind_sdid3p1, type = 'dynamic')
+wind_sdid4p1_cs <- aggte(wind_sdid4p1, type = 'dynamic')
+
+# Viewing results
+
+summary(wind_sdid1p1_cs)
+summary(wind_sdid2p1_cs)
+summary(wind_sdid3p1_cs)
+summary(wind_sdid4p1_cs)
+
+ggdid(wind_sdid1p1_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -\n\n- Placebo Test -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(wind_sdid2p1_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -\n\n- Placebo Test -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(wind_sdid3p1_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -\n\n- Placebo Test -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(wind_sdid4p1_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -\n\n- Placebo Test -') + theme(plot.title = element_text(hjust = 0.5))
+
+# (2) create artificial outcomes - show results and event study plots
+
+sol.data$Placebo <- sol.data$LogPop[s_ids]
+wind.data$Placebo <- wind.data$LogPop[w_ids]
+
+# Running the staggered diff-in-diff for solar with additional controls
+
+sol_sdid1p2 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time_P', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = sol.data)
+sol_sdid2p2 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time_P', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = sol.data)
+sol_sdid3p2 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time_P', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = sol.data)
+sol_sdid4p2 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time_P', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = sol.data)
+
+sol_sdid1p2_cs <- aggte(sol_sdid1p2, type = 'dynamic')
+sol_sdid2p2_cs <- aggte(sol_sdid2p2, type = 'dynamic')
+sol_sdid3p2_cs <- aggte(sol_sdid3p2, type = 'dynamic')
+sol_sdid4p2_cs <- aggte(sol_sdid4p2, type = 'dynamic')
+
+# Viewing results
+
+summary(sol_sdid1p2_cs)
+summary(sol_sdid2p2_cs)
+summary(sol_sdid3p2_cs)
+summary(sol_sdid4p2_cs)
+
+ggdid(sol_sdid1p2_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -\n\n- Placebo Test -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(sol_sdid2p2_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -\n\n- Placebo Test -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(sol_sdid3p2_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -\n\n- Placebo Test -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(sol_sdid4p2_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -\n\n- Placebo Test -') + theme(plot.title = element_text(hjust = 0.5))
+
+# Running the staggered diff-in-diff for wind with additional controls
+
+wind_sdid1p2 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time_P', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind.data)
+wind_sdid2p2 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time_P', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind.data)
+wind_sdid3p2 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time_P', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind.data)
+wind_sdid4p2 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time_P', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind.data)
+
+wind_sdid1p2_cs <- aggte(wind_sdid1p2, type = 'dynamic')
+wind_sdid2p2_cs <- aggte(wind_sdid2p2, type = 'dynamic')
+wind_sdid3p2_cs <- aggte(wind_sdid3p2, type = 'dynamic')
+wind_sdid4p2_cs <- aggte(wind_sdid4p2, type = 'dynamic')
+
+# Viewing results
+
+summary(wind_sdid1p2_cs)
+summary(wind_sdid2p2_cs)
+summary(wind_sdid3p2_cs)
+summary(wind_sdid4p2_cs)
+
+ggdid(wind_sdid1p2_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -\n\n- Placebo Test -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(wind_sdid2p2_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -\n\n- Placebo Test -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(wind_sdid3p2_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -\n\n- Placebo Test -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(wind_sdid4p2_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -\n\n- Placebo Test -') + theme(plot.title = element_text(hjust = 0.5))
+
+# Saving placebo results
+
+atandt <- rbind(c(wind_sdid1p1_cs$overall.att, wind_sdid2p1_cs$overall.att, wind_sdid3p1_cs$overall.att, wind_sdid4p1_cs$overall.att),
+                c(sol_sdid1p1_cs$overall.att, sol_sdid2p1_cs$overall.att, sol_sdid3p1_cs$overall.att, sol_sdid4p1_cs$overall.att),
+                c(wind_sdid1p2_cs$overall.att, wind_sdid2p2_cs$overall.att, wind_sdid3p2_cs$overall.att, wind_sdid4p2_cs$overall.att),
+                c(sol_sdid1p2_cs$overall.att, sol_sdid2p2_cs$overall.att, sol_sdid3p2_cs$overall.att, sol_sdid4p2_cs$overall.att))
+
+serrs <- rbind(c(wind_sdid1p1_cs$overall.se, wind_sdid2p1_cs$overall.se, wind_sdid3p1_cs$overall.se, wind_sdid4p1_cs$overall.se),
+               c(sol_sdid1p1_cs$overall.se, sol_sdid2p1_cs$overall.se, sol_sdid3p1_cs$overall.se, sol_sdid4p1_cs$overall.se),
+               c(wind_sdid1p2_cs$overall.se, wind_sdid2p2_cs$overall.se, wind_sdid3p2_cs$overall.se, wind_sdid4p2_cs$overall.se),
+               c(sol_sdid1p2_cs$overall.se, sol_sdid2p2_cs$overall.se, sol_sdid3p2_cs$overall.se, sol_sdid4p2_cs$overall.se))
+
+t.stats <- atandt / serrs
+
+p.10 <- matrix(as.integer(abs(t.stats) > 1.645), 8, 4)
+p.05 <- matrix(as.integer(abs(t.stats) > 1.960), 8, 4)
+p.01 <- matrix(as.integer(abs(t.stats) > 2.576), 8, 4)
+
+stars <- matrix(0, 4, 4)
+
+for (i in 1:4) {
+  
+  for (j in 1:4) {
+    
+    if (p.01[i,j] == 1) {
+      
+      stars[i,j] <- 3
+      
+    } else if (p.05[i,j] == 1) {
+      
+      stars[i,j] <- 2
+      
+    } else if (p.10[i,j] == 1) {
+      
+      stars[i,j] <- 1
+      
+    }
+    
+  }
+  
+}
+
+atandt <- round(atandt, 3)
+serrs <- round(serrs, 3)
+
+write.csv(atandt, paste0(direc, 'results/placebo_coefs.txt'), row.names = FALSE)
+write.csv(serrs, paste0(direc, 'results/placebo_serrs.txt'), row.names = FALSE)
+write.csv(stars, paste0(direc, 'results/placebo_stars.txt'), row.names = FALSE)
 
