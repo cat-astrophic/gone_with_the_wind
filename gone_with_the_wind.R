@@ -40,9 +40,10 @@ wind <- read_sf(paste0(direc, 'data/uswtdbSHP/uswtdb_V8_1_20250522.shp'))
 sol <- read_sf(paste0(direc, 'data/uspvdbSHP/uspvdb_v3_0_20250430.shp'))
 ruc <- read.csv(paste0(direc, 'data/Ruralurbancontinuumcodes2023.csv'))
 
-# Remove wind observations where p_year == -9999
+# Remove observations where year == -9999 and where year > 2023
 
-wind <- wind %>% filter(p_year > 0)
+wind <- wind %>% filter(p_year > 0) %>% filter(p_year <= 2023)
+sol <- sol %>% filter(p_year <= 2023)
 
 # Get counties shapefile with FIPS codes for the US
 
@@ -139,7 +140,7 @@ v18 <- c('DP03_0062', 'DP03_0009P', 'DP02_0061P', 'DP02_0067P')
 v23 <- c('DP03_0062', 'DP03_0009P', 'DP02_0062P', 'DP02_0068P')
 
 acs.x <- as.data.frame(get_acs(geography = 'county', year = 2009, variables = v09))
-acs.x$Year <- rep(y, nrow(acs.x))
+acs.x$Year <- rep(2009, nrow(acs.x))
 
 v <- c()
 
@@ -321,6 +322,8 @@ colnames(acs.data)[10:13] <- c('Treated_Solar', 'Treated_Wind', 'Post_Solar', 'P
 acs.data$DiD_Solar <- acs.data$Treated_Solar * acs.data$Post_Solar
 acs.data$DiD_Wind <- acs.data$Treated_Wind * acs.data$Post_Wind
 
+# Log population data
+
 acs.data$LogPop <- log(acs.data$Population)
 acs.data$LogLag <- log(acs.data$Lagged)
 
@@ -376,7 +379,7 @@ for (i in 1:nrow(acs.data)) {
 
 acs.data$ID <- id.vals
 
-# Remove units treated in first period
+# Remove units treated in first period (or prior)
 
 sol.data <- acs.data %>% filter(Sol_Treat_Time != 1)
 wind.data <- acs.data %>% filter(Wind_Treat_Time != 1)
@@ -428,11 +431,6 @@ ggdid(wind_sdid1_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Tur
 ggdid(wind_sdid2_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -') + theme(plot.title = element_text(hjust = 0.5))
 ggdid(wind_sdid3_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -') + theme(plot.title = element_text(hjust = 0.5))
 ggdid(wind_sdid4_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -') + theme(plot.title = element_text(hjust = 0.5))
-
-# Dropping 2023 due to some missing controls
-
-sol.data <- sol.data %>% filter(Year < 2023)
-wind.data <- wind.data %>% filter(Year < 2023)
 
 # Running the staggered diff-in-diff for solar with additional controls
 
@@ -559,8 +557,8 @@ for (i in 1:nrow(acs.data)) {
 
 acs.data$Urban <- hurb
 
-sol.data <- acs.data %>% filter(Sol_Treat_Time != 1) %>% filter(Year < 2023)
-wind.data <- acs.data %>% filter(Wind_Treat_Time != 1) %>% filter(Year < 2023)
+sol.data <- acs.data %>% filter(Sol_Treat_Time != 1)
+wind.data <- acs.data %>% filter(Wind_Treat_Time != 1)
 
 # Running heterogeneity analyses across the urban-rural divide
 
@@ -660,7 +658,7 @@ summary(rwind_sdid3_cs)
 summary(rwind_sdid4_cs)
 
 ggdid(rwind_sdid1_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
-ggdid(rwind_sdid2_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5)) + ylim(c(-.1, .05))
+ggdid(rwind_sdid2_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5)) + ylim(c(-.1, .1))
 ggdid(rwind_sdid3_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
 ggdid(rwind_sdid4_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
 
@@ -733,13 +731,13 @@ datasummary_skim(sums, fmt = '%.3f')
 
 # (1) randomize treatment and timing together
 
-sol.data <- acs.data %>% filter(Sol_Treat_Time != 1) %>% filter(Year < 2023)
-wind.data <- acs.data %>% filter(Wind_Treat_Time != 1) %>% filter(Year < 2023)
+sol.data <- acs.data %>% filter(Sol_Treat_Time != 1)
+wind.data <- acs.data %>% filter(Wind_Treat_Time != 1)
 
 sol.data <- sol.data %>% filter(!is.na(Sol_Treat_Time)) %>% filter(!is.na(LogPop)) %>% filter(!is.na(LogLag)) %>% filter(!is.na(Income)) %>% filter(!is.na(Unemployment)) %>% filter(!is.na(HS)) %>% filter(!is.na(BS))
 wind.data <- wind.data %>% filter(!is.na(Wind_Treat_Time)) %>% filter(!is.na(LogPop)) %>% filter(!is.na(LogLag)) %>% filter(!is.na(Income)) %>% filter(!is.na(Unemployment)) %>% filter(!is.na(HS)) %>% filter(!is.na(BS))
 
-set.seed(7734)
+set.seed(420)
 
 s_ids <- sample(nrow(sol.data))
 w_ids <- sample(nrow(wind.data))
@@ -800,12 +798,27 @@ ggdid(wind_sdid4p1_cs, title = 'Average Effect by Length of Exposure\n\n- Wind T
 sol.data$Placebo <- sol.data$LogPop[s_ids]
 wind.data$Placebo <- wind.data$LogPop[w_ids]
 
+sol.data$LogLag2 <- sol.data$LogLag[s_ids]
+wind.data$LogLag2 <- wind.data$LogLag[w_ids]
+
+sol.data$Income2 <- sol.data$Income[s_ids]
+wind.data$Income2 <- wind.data$Income[w_ids]
+
+sol.data$Unemployment2 <- sol.data$Unemployment[s_ids]
+wind.data$Unemployment2 <- wind.data$Unemployment[w_ids]
+
+sol.data$HS2 <- sol.data$HS[s_ids]
+wind.data$HS2 <- wind.data$HS[w_ids]
+
+sol.data$BS2 <- sol.data$BS[s_ids]
+wind.data$BS2 <- wind.data$BS[w_ids]
+
 # Running the staggered diff-in-diff for solar with additional controls
 
-sol_sdid1p2 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time_P', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = sol.data)
-sol_sdid2p2 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time_P', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = sol.data)
-sol_sdid3p2 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time_P', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = sol.data)
-sol_sdid4p2 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time_P', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = sol.data)
+sol_sdid1p2 <- att_gt(yname = 'Placebo', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', xformla = ~ LogLag2 + Income2 + Unemployment2 + HS2 + BS2, clustervars = 'ID', data = sol.data)
+sol_sdid2p2 <- att_gt(yname = 'Placebo', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', xformla = ~ LogLag2 + Income2 + Unemployment2 + HS2 + BS2, control_group = 'notyettreated', clustervars = 'ID', data = sol.data)
+sol_sdid3p2 <- att_gt(yname = 'Placebo', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', anticipation = 1, xformla = ~ LogLag2 + Income2 + Unemployment2 + HS2 + BS2, clustervars = 'ID', data = sol.data)
+sol_sdid4p2 <- att_gt(yname = 'Placebo', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', anticipation = 1, xformla = ~ LogLag2 + Income2 + Unemployment2 + HS2 + BS2, control_group = 'notyettreated', clustervars = 'ID', data = sol.data)
 
 sol_sdid1p2_cs <- aggte(sol_sdid1p2, type = 'dynamic')
 sol_sdid2p2_cs <- aggte(sol_sdid2p2, type = 'dynamic')
@@ -826,10 +839,10 @@ ggdid(sol_sdid4p2_cs, title = 'Average Effect by Length of Exposure\n\n- Solar F
 
 # Running the staggered diff-in-diff for wind with additional controls
 
-wind_sdid1p2 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time_P', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind.data)
-wind_sdid2p2 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time_P', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind.data)
-wind_sdid3p2 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time_P', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind.data)
-wind_sdid4p2 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time_P', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind.data)
+wind_sdid1p2 <- att_gt(yname = 'Placebo', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', xformla = ~ LogLag2 + Income2 + Unemployment2 + HS2 + BS2, clustervars = 'ID', data = wind.data)
+wind_sdid2p2 <- att_gt(yname = 'Placebo', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', xformla = ~ LogLag2 + Income2 + Unemployment2 + HS2 + BS2, control_group = 'notyettreated', clustervars = 'ID', data = wind.data)
+wind_sdid3p2 <- att_gt(yname = 'Placebo', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', anticipation = 1, xformla = ~ LogLag2 + Income2 + Unemployment2 + HS2 + BS2, clustervars = 'ID', data = wind.data)
+wind_sdid4p2 <- att_gt(yname = 'Placebo', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', anticipation = 1, xformla = ~ LogLag2 + Income2 + Unemployment2 + HS2 + BS2, control_group = 'notyettreated', clustervars = 'ID', data = wind.data)
 
 wind_sdid1p2_cs <- aggte(wind_sdid1p2, type = 'dynamic')
 wind_sdid2p2_cs <- aggte(wind_sdid2p2, type = 'dynamic')
@@ -862,9 +875,9 @@ serrs <- rbind(c(wind_sdid1p1_cs$overall.se, wind_sdid2p1_cs$overall.se, wind_sd
 
 t.stats <- atandt / serrs
 
-p.10 <- matrix(as.integer(abs(t.stats) > 1.645), 8, 4)
-p.05 <- matrix(as.integer(abs(t.stats) > 1.960), 8, 4)
-p.01 <- matrix(as.integer(abs(t.stats) > 2.576), 8, 4)
+p.10 <- matrix(as.integer(abs(t.stats) > 1.645), 4, 4)
+p.05 <- matrix(as.integer(abs(t.stats) > 1.960), 4, 4)
+p.01 <- matrix(as.integer(abs(t.stats) > 2.576), 4, 4)
 
 stars <- matrix(0, 4, 4)
 
@@ -896,4 +909,814 @@ serrs <- round(serrs, 3)
 write.csv(atandt, paste0(direc, 'results/placebo_coefs.txt'), row.names = FALSE)
 write.csv(serrs, paste0(direc, 'results/placebo_serrs.txt'), row.names = FALSE)
 write.csv(stars, paste0(direc, 'results/placebo_stars.txt'), row.names = FALSE)
+
+# Remove units receiving the other treatment and re-run main analysis
+
+wind_only <- acs.data %>% filter(Treated_Solar == 0)
+solar_only <- acs.data %>% filter(Treated_Wind == 0)
+
+# Running the staggered diff-in-diff for solar with additional controls
+
+sol_sdid111 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = solar_only)
+sol_sdid222 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = solar_only)
+sol_sdid333 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = solar_only)
+sol_sdid444 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = solar_only)
+
+sol_sdid111_cs <- aggte(sol_sdid111, type = 'dynamic')
+sol_sdid222_cs <- aggte(sol_sdid222, type = 'dynamic')
+sol_sdid333_cs <- aggte(sol_sdid333, type = 'dynamic')
+sol_sdid444_cs <- aggte(sol_sdid444, type = 'dynamic')
+
+# Viewing results
+
+summary(sol_sdid111_cs)
+summary(sol_sdid222_cs)
+summary(sol_sdid333_cs)
+summary(sol_sdid444_cs)
+
+ggdid(sol_sdid111_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(sol_sdid222_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(sol_sdid333_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(sol_sdid444_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -') + theme(plot.title = element_text(hjust = 0.5))
+
+# Running the staggered diff-in-diff for wind with additional controls
+
+wind_sdid111 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind_only)
+wind_sdid222 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind_only)
+wind_sdid333 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind_only)
+wind_sdid444 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind_only)
+
+wind_sdid111_cs <- aggte(wind_sdid111, type = 'dynamic')
+wind_sdid222_cs <- aggte(wind_sdid222, type = 'dynamic')
+wind_sdid333_cs <- aggte(wind_sdid333, type = 'dynamic')
+wind_sdid444_cs <- aggte(wind_sdid444, type = 'dynamic')
+
+# Viewing results
+
+summary(wind_sdid111_cs)
+summary(wind_sdid222_cs)
+summary(wind_sdid333_cs)
+summary(wind_sdid444_cs)
+
+ggdid(wind_sdid111_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(wind_sdid222_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(wind_sdid333_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(wind_sdid444_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -') + theme(plot.title = element_text(hjust = 0.5))
+
+# Robustness tests where we match counties
+
+w.treat.df <- wind_only %>% filter(Treated_Wind == 1)
+w.con.df <- wind_only %>% filter(Treated_Wind == 0)
+
+s.treat.df <- solar_only %>% filter(Treated_Solar == 1)
+s.con.df <- solar_only %>% filter(Treated_Solar == 0)
+
+w.treated.units <- unique(w.treat.df$ID)
+w.control.units <- unique(w.con.df$ID)
+
+s.treated.units <- unique(s.treat.df$ID)
+s.control.units <- unique(s.con.df$ID)
+
+w.treat.keep <- c()
+w.con.keep <- c()
+
+for (i in w.treated.units) {
+  
+  print(i)
+  
+  tmp <- w.treat.df %>% filter(ID == i)
+  tmp <- tmp %>% filter(Time < tmp$Wind_Treat_Time[1])
+  tmp2 <- w.con.df %>% filter(Time < tmp$Wind_Treat_Time[1])
+  
+  con_ids <- unique(tmp2$ID)
+  con_pop <- c()
+  con_inc <- c()
+  con_une <- c()
+  
+  for (j in con_ids) {
+    
+    tmp3 <- tmp2 %>% filter(ID == j)
+    con_pop <- c(con_pop, mean(tmp3$LogLag))
+    con_inc <- c(con_inc, mean(tmp3$Income))
+    con_une <- c(con_une, mean(tmp3$Unemployment))
+    
+  }
+  
+  ref_pop <- mean(tmp$LogLag)
+  ref_inc <- mean(tmp$Income)
+  ref_une <- mean(tmp$Unemployment)
+  
+  good_pop <- con_ids[which(abs(con_pop - ref_pop) < (.05 * ref_pop))]
+  good_inc <- con_ids[which(abs(con_inc - ref_inc) < (.05 * ref_inc))]
+  good_une <- con_ids[which(abs(con_une - ref_une) < 1)]
+  
+  keep_cons <- good_pop[which(good_pop %in% good_inc)]
+  keep_cons <- keep_cons[which(keep_cons %in% good_une)]
+  
+  w.con.keep <- c(w.con.keep, keep_cons)
+  w.con.keep <- unique(w.con.keep)
+  
+  if (length(keep_cons) > 0) {
+    
+    w.treat.keep <- c(w.treat.keep, i)
+    
+  }
+  
+}
+
+s.treat.keep <- c()
+s.con.keep <- c()
+
+for (i in s.treated.units) {
+  
+  print(i)
+  
+  tmp <- s.treat.df %>% filter(ID == i)
+  tmp <- tmp %>% filter(Time < tmp$Sol_Treat_Time[1])
+  tmp2 <- s.con.df %>% filter(Time < tmp$Sol_Treat_Time[1])
+  
+  con_ids <- unique(tmp2$ID)
+  con_pop <- c()
+  con_inc <- c()
+  con_une <- c()
+  
+  for (j in con_ids) {
+    
+    tmp3 <- tmp2 %>% filter(ID == j)
+    con_pop <- c(con_pop, mean(tmp3$LogLag))
+    con_inc <- c(con_inc, mean(tmp3$Income))
+    con_une <- c(con_une, mean(tmp3$Unemployment))
+    
+  }
+  
+  ref_pop <- mean(tmp$LogLag)
+  ref_inc <- mean(tmp$Income)
+  ref_une <- mean(tmp$Unemployment)
+  
+  good_pop <- con_ids[which(abs(con_pop - ref_pop) < (.05 * ref_pop))]
+  good_inc <- con_ids[which(abs(con_inc - ref_inc) < (.05 * ref_inc))]
+  good_une <- con_ids[which(abs(con_une - ref_une) < 1)]
+  
+  keep_cons <- good_pop[which(good_pop %in% good_inc)]
+  keep_cons <- keep_cons[which(keep_cons %in% good_une)]
+  
+  s.con.keep <- c(s.con.keep, keep_cons)
+  s.con.keep <- unique(s.con.keep)
+  
+  if (length(keep_cons) > 0) {
+    
+    s.treat.keep <- c(s.treat.keep, i)
+    
+  }
+  
+}
+
+w.treat.dfx <- wind_only %>% filter(ID %in% w.treat.keep)
+w.con.dfx <- wind_only %>% filter(ID %in% w.con.keep)
+wind_sub <- rbind(w.treat.dfx, w.con.dfx)
+
+s.treat.dfx <- solar_only %>% filter(ID %in% s.treat.keep)
+s.con.dfx <- solar_only %>% filter(ID %in% s.con.keep)
+solar_sub <- rbind(s.treat.dfx, s.con.dfx)
+
+# Running the staggered diff-in-diff for solar with additional controls
+
+sol_sdid111m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = solar_sub)
+sol_sdid222m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = solar_sub)
+sol_sdid333m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = solar_sub)
+sol_sdid444m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = solar_sub)
+
+sol_sdid111m_cs <- aggte(sol_sdid111m, type = 'dynamic')
+sol_sdid222m_cs <- aggte(sol_sdid222m, type = 'dynamic')
+sol_sdid333m_cs <- aggte(sol_sdid333m, type = 'dynamic')
+sol_sdid444m_cs <- aggte(sol_sdid444m, type = 'dynamic')
+
+# Viewing results
+
+summary(sol_sdid111m_cs)
+summary(sol_sdid222m_cs)
+summary(sol_sdid333m_cs)
+summary(sol_sdid444m_cs)
+
+ggdid(sol_sdid111m_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(sol_sdid222m_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(sol_sdid333m_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(sol_sdid444m_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities -') + theme(plot.title = element_text(hjust = 0.5))
+
+# Running the staggered diff-in-diff for wind with additional controls
+
+wind_sdid111m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind_sub)
+wind_sdid222m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind_sub)
+wind_sdid333m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind_sub)
+wind_sdid444m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind_sub)
+
+wind_sdid111m_cs <- aggte(wind_sdid111m, type = 'dynamic')
+wind_sdid222m_cs <- aggte(wind_sdid222m, type = 'dynamic')
+wind_sdid333m_cs <- aggte(wind_sdid333m, type = 'dynamic')
+wind_sdid444m_cs <- aggte(wind_sdid444m, type = 'dynamic')
+
+# Viewing results
+
+summary(wind_sdid111m_cs)
+summary(wind_sdid222m_cs)
+summary(wind_sdid333m_cs)
+summary(wind_sdid444m_cs)
+
+ggdid(wind_sdid111m_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(wind_sdid222m_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(wind_sdid333m_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(wind_sdid444m_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines -') + theme(plot.title = element_text(hjust = 0.5))
+
+# Repeating the urban/rural analyses with the truncated data set
+
+# Urban counties
+
+# Running the staggered diff-in-diff for solar
+
+usol_sdid11 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = solar_only[which(solar_only$Urban == 1),])
+usol_sdid22 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = solar_only[which(solar_only$Urban == 1),])
+usol_sdid33 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = solar_only[which(solar_only$Urban == 1),])
+usol_sdid44 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = solar_only[which(solar_only$Urban == 1),])
+
+usol_sdid11_cs <- aggte(usol_sdid11, type = 'dynamic', na.rm = TRUE)
+usol_sdid22_cs <- aggte(usol_sdid22, type = 'dynamic', na.rm = TRUE)
+usol_sdid33_cs <- aggte(usol_sdid33, type = 'dynamic', na.rm = TRUE)
+usol_sdid44_cs <- aggte(usol_sdid44, type = 'dynamic', na.rm = TRUE)
+
+# Viewing results
+
+summary(usol_sdid11_cs)
+summary(usol_sdid22_cs)
+summary(usol_sdid33_cs)
+summary(usol_sdid44_cs)
+
+ggdid(usol_sdid11_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities in Urban Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(usol_sdid22_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities in Urban Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(usol_sdid33_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities in Urban Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(usol_sdid44_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities in Urban Counties -') + theme(plot.title = element_text(hjust = 0.5))
+
+# Running the staggered diff-in-diff for wind
+
+uwind_sdid11 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind_only[which(wind_only$Urban == 1),])
+uwind_sdid22 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind_only[which(wind_only$Urban == 1),])
+uwind_sdid33 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind_only[which(wind_only$Urban == 1),])
+uwind_sdid44 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind_only[which(wind_only$Urban == 1),])
+
+uwind_sdid11_cs <- aggte(uwind_sdid11, type = 'dynamic', na.rm = TRUE)
+uwind_sdid22_cs <- aggte(uwind_sdid22, type = 'dynamic', na.rm = TRUE)
+uwind_sdid33_cs <- aggte(uwind_sdid33, type = 'dynamic', na.rm = TRUE)
+uwind_sdid44_cs <- aggte(uwind_sdid44, type = 'dynamic', na.rm = TRUE)
+
+# Viewing results
+
+summary(uwind_sdid11_cs)
+summary(uwind_sdid22_cs)
+summary(uwind_sdid33_cs)
+summary(uwind_sdid44_cs)
+
+ggdid(uwind_sdid11_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Urban Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(uwind_sdid22_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Urban Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(uwind_sdid33_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Urban Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(uwind_sdid44_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Urban Counties -') + theme(plot.title = element_text(hjust = 0.5))
+
+# Rural counties
+
+# Running the staggered diff-in-diff for solar
+
+rsol_sdid11 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = solar_only[which(solar_only$Urban == 0),])
+rsol_sdid22 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = solar_only[which(solar_only$Urban == 0),])
+rsol_sdid33 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = solar_only[which(solar_only$Urban == 0),])
+rsol_sdid44 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = solar_only[which(solar_only$Urban == 0),])
+
+rsol_sdid11_cs <- aggte(rsol_sdid11, type = 'dynamic', na.rm = TRUE)
+rsol_sdid22_cs <- aggte(rsol_sdid22, type = 'dynamic', na.rm = TRUE)
+rsol_sdid33_cs <- aggte(rsol_sdid33, type = 'dynamic', na.rm = TRUE)
+rsol_sdid44_cs <- aggte(rsol_sdid44, type = 'dynamic', na.rm = TRUE)
+
+# Viewing results
+
+summary(rsol_sdid11_cs)
+summary(rsol_sdid22_cs)
+summary(rsol_sdid33_cs)
+summary(rsol_sdid44_cs)
+
+ggdid(rsol_sdid11_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(rsol_sdid22_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(rsol_sdid33_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(rsol_sdid44_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
+
+# Running the staggered diff-in-diff for wind
+
+rwind_sdid11 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind_only[which(wind_only$Urban == 0),])
+rwind_sdid22 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind_only[which(wind_only$Urban == 0),])
+rwind_sdid33 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind_only[which(wind_only$Urban == 0),])
+rwind_sdid44 <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind_only[which(wind_only$Urban == 0),])
+
+rwind_sdid11_cs <- aggte(rwind_sdid11, type = 'dynamic', na.rm = TRUE)
+rwind_sdid22_cs <- aggte(rwind_sdid22, type = 'dynamic', na.rm = TRUE)
+rwind_sdid33_cs <- aggte(rwind_sdid33, type = 'dynamic', na.rm = TRUE)
+rwind_sdid44_cs <- aggte(rwind_sdid44, type = 'dynamic', na.rm = TRUE)
+
+# Viewing results
+
+summary(rwind_sdid11_cs)
+summary(rwind_sdid22_cs)
+summary(rwind_sdid33_cs)
+summary(rwind_sdid44_cs)
+
+ggdid(rwind_sdid11_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(rwind_sdid22_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5)) + ylim(c(-.1, .1))
+ggdid(rwind_sdid33_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(rwind_sdid44_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
+
+# Repeating the urban/rural analyses with the matched data set
+
+# Robustness tests where we match counties
+
+# Urban only matching
+
+uw.treat.df <- wind_only %>% filter(Treated_Wind == 1) %>% filter(Urban == 1)
+uw.con.df <- wind_only %>% filter(Treated_Wind == 0) %>% filter(Urban == 1)
+
+us.treat.df <- solar_only %>% filter(Treated_Solar == 1) %>% filter(Urban == 1)
+us.con.df <- solar_only %>% filter(Treated_Solar == 0) %>% filter(Urban == 1)
+
+uw.treated.units <- unique(uw.treat.df$ID)
+uw.control.units <- unique(uw.con.df$ID)
+
+us.treated.units <- unique(us.treat.df$ID)
+us.control.units <- unique(us.con.df$ID)
+
+uw.treat.keep <- c()
+uw.con.keep <- c()
+
+for (i in uw.treated.units) {
+  
+  print(i)
+  
+  tmp <- uw.treat.df %>% filter(ID == i)
+  tmp <- tmp %>% filter(Time < tmp$Wind_Treat_Time[1])
+  tmp2 <- uw.con.df %>% filter(Time < tmp$Wind_Treat_Time[1])
+  
+  con_ids <- unique(tmp2$ID)
+  con_pop <- c()
+  con_inc <- c()
+  con_une <- c()
+  
+  for (j in con_ids) {
+    
+    tmp3 <- tmp2 %>% filter(ID == j)
+    con_pop <- c(con_pop, mean(tmp3$LogLag))
+    con_inc <- c(con_inc, mean(tmp3$Income))
+    con_une <- c(con_une, mean(tmp3$Unemployment))
+    
+  }
+  
+  ref_pop <- mean(tmp$LogLag)
+  ref_inc <- mean(tmp$Income)
+  ref_une <- mean(tmp$Unemployment)
+  
+  good_pop <- con_ids[which(abs(con_pop - ref_pop) < (.05 * ref_pop))]
+  good_inc <- con_ids[which(abs(con_inc - ref_inc) < (.05 * ref_inc))]
+  good_une <- con_ids[which(abs(con_une - ref_une) < 1)]
+  
+  keep_cons <- good_pop[which(good_pop %in% good_inc)]
+  keep_cons <- keep_cons[which(keep_cons %in% good_une)]
+  
+  uw.con.keep <- c(uw.con.keep, keep_cons)
+  uw.con.keep <- unique(uw.con.keep)
+  
+  if (length(keep_cons) > 0) {
+    
+    uw.treat.keep <- c(uw.treat.keep, i)
+    
+  }
+  
+}
+
+us.treat.keep <- c()
+us.con.keep <- c()
+
+for (i in us.treated.units) {
+  
+  print(i)
+  
+  tmp <- us.treat.df %>% filter(ID == i)
+  tmp <- tmp %>% filter(Time < tmp$Sol_Treat_Time[1])
+  tmp2 <- us.con.df %>% filter(Time < tmp$Sol_Treat_Time[1])
+  
+  con_ids <- unique(tmp2$ID)
+  con_pop <- c()
+  con_inc <- c()
+  con_une <- c()
+  
+  for (j in con_ids) {
+    
+    tmp3 <- tmp2 %>% filter(ID == j)
+    con_pop <- c(con_pop, mean(tmp3$LogLag))
+    con_inc <- c(con_inc, mean(tmp3$Income))
+    con_une <- c(con_une, mean(tmp3$Unemployment))
+    
+  }
+  
+  ref_pop <- mean(tmp$LogLag)
+  ref_inc <- mean(tmp$Income)
+  ref_une <- mean(tmp$Unemployment)
+  
+  good_pop <- con_ids[which(abs(con_pop - ref_pop) < (.05 * ref_pop))]
+  good_inc <- con_ids[which(abs(con_inc - ref_inc) < (.05 * ref_inc))]
+  good_une <- con_ids[which(abs(con_une - ref_une) < 1)]
+  
+  keep_cons <- good_pop[which(good_pop %in% good_inc)]
+  keep_cons <- keep_cons[which(keep_cons %in% good_une)]
+  
+  us.con.keep <- c(us.con.keep, keep_cons)
+  us.con.keep <- unique(us.con.keep)
+  
+  if (length(keep_cons) > 0) {
+    
+    us.treat.keep <- c(us.treat.keep, i)
+    
+  }
+  
+}
+
+uw.treat.dfx <- wind_only %>% filter(ID %in% uw.treat.keep)
+uw.con.dfx <- wind_only %>% filter(ID %in% uw.con.keep)
+wind_sub.u <- rbind(uw.treat.dfx, uw.con.dfx)
+
+us.treat.dfx <- solar_only %>% filter(ID %in% us.treat.keep)
+us.con.dfx <- solar_only %>% filter(ID %in% us.con.keep)
+solar_sub.u <- rbind(us.treat.dfx, us.con.dfx)
+
+# Rural only matching
+
+rw.treat.df <- wind_only %>% filter(Treated_Wind == 1) %>% filter(Urban == 0)
+rw.con.df <- wind_only %>% filter(Treated_Wind == 0) %>% filter(Urban == 0)
+
+rs.treat.df <- solar_only %>% filter(Treated_Solar == 1) %>% filter(Urban == 0)
+rs.con.df <- solar_only %>% filter(Treated_Solar == 0) %>% filter(Urban == 0)
+
+rw.treated.units <- unique(rw.treat.df$ID)
+rw.control.units <- unique(rw.con.df$ID)
+
+rs.treated.units <- unique(rs.treat.df$ID)
+rs.control.units <- unique(rs.con.df$ID)
+
+rw.treat.keep <- c()
+rw.con.keep <- c()
+
+for (i in rw.treated.units) {
+  
+  print(i)
+  
+  tmp <- rw.treat.df %>% filter(ID == i)
+  tmp <- tmp %>% filter(Time < tmp$Wind_Treat_Time[1])
+  tmp2 <- rw.con.df %>% filter(Time < tmp$Wind_Treat_Time[1])
+  
+  con_ids <- unique(tmp2$ID)
+  con_pop <- c()
+  con_inc <- c()
+  con_une <- c()
+  
+  for (j in con_ids) {
+    
+    tmp3 <- tmp2 %>% filter(ID == j)
+    con_pop <- c(con_pop, mean(tmp3$LogLag))
+    con_inc <- c(con_inc, mean(tmp3$Income))
+    con_une <- c(con_une, mean(tmp3$Unemployment))
+    
+  }
+  
+  ref_pop <- mean(tmp$LogLag)
+  ref_inc <- mean(tmp$Income)
+  ref_une <- mean(tmp$Unemployment)
+  
+  good_pop <- con_ids[which(abs(con_pop - ref_pop) < (.05 * ref_pop))]
+  good_inc <- con_ids[which(abs(con_inc - ref_inc) < (.05 * ref_inc))]
+  good_une <- con_ids[which(abs(con_une - ref_une) < 1)]
+  
+  keep_cons <- good_pop[which(good_pop %in% good_inc)]
+  keep_cons <- keep_cons[which(keep_cons %in% good_une)]
+  
+  rw.con.keep <- c(rw.con.keep, keep_cons)
+  rw.con.keep <- unique(rw.con.keep)
+  
+  if (length(keep_cons) > 0) {
+    
+    rw.treat.keep <- c(rw.treat.keep, i)
+    
+  }
+  
+}
+
+rs.treat.keep <- c()
+rs.con.keep <- c()
+
+for (i in rs.treated.units) {
+  
+  print(i)
+  
+  tmp <- rs.treat.df %>% filter(ID == i)
+  tmp <- tmp %>% filter(Time < tmp$Sol_Treat_Time[1])
+  tmp2 <- rs.con.df %>% filter(Time < tmp$Sol_Treat_Time[1])
+  
+  con_ids <- unique(tmp2$ID)
+  con_pop <- c()
+  con_inc <- c()
+  con_une <- c()
+  
+  for (j in con_ids) {
+    
+    tmp3 <- tmp2 %>% filter(ID == j)
+    con_pop <- c(con_pop, mean(tmp3$LogLag))
+    con_inc <- c(con_inc, mean(tmp3$Income))
+    con_une <- c(con_une, mean(tmp3$Unemployment))
+    
+  }
+  
+  ref_pop <- mean(tmp$LogLag)
+  ref_inc <- mean(tmp$Income)
+  ref_une <- mean(tmp$Unemployment)
+  
+  good_pop <- con_ids[which(abs(con_pop - ref_pop) < (.05 * ref_pop))]
+  good_inc <- con_ids[which(abs(con_inc - ref_inc) < (.05 * ref_inc))]
+  good_une <- con_ids[which(abs(con_une - ref_une) < 1)]
+  
+  keep_cons <- good_pop[which(good_pop %in% good_inc)]
+  keep_cons <- keep_cons[which(keep_cons %in% good_une)]
+  
+  rs.con.keep <- c(rs.con.keep, keep_cons)
+  rs.con.keep <- unique(rs.con.keep)
+  
+  if (length(keep_cons) > 0) {
+    
+    rs.treat.keep <- c(rs.treat.keep, i)
+    
+  }
+  
+}
+
+rw.treat.dfx <- wind_only %>% filter(ID %in% rw.treat.keep)
+rw.con.dfx <- wind_only %>% filter(ID %in% rw.con.keep)
+wind_sub.r <- rbind(rw.treat.dfx, rw.con.dfx)
+
+rs.treat.dfx <- solar_only %>% filter(ID %in% rs.treat.keep)
+rs.con.dfx <- solar_only %>% filter(ID %in% rs.con.keep)
+solar_sub.r <- rbind(rs.treat.dfx, rs.con.dfx)
+
+# Running the rura/urban staggered diff-in-diff for solar with matching
+
+# Urban counties
+
+# Running the staggered diff-in-diff for solar
+
+usol_sdid11m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = solar_sub.u[which(solar_sub.u$Urban == 1),])
+usol_sdid22m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = solar_sub.u[which(solar_sub.u$Urban == 1),])
+usol_sdid33m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = solar_sub.u[which(solar_sub.u$Urban == 1),])
+usol_sdid44m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = solar_sub.u[which(solar_sub.u$Urban == 1),])
+
+usol_sdid11m_cs <- aggte(usol_sdid11m, type = 'dynamic', na.rm = TRUE)
+usol_sdid22m_cs <- aggte(usol_sdid22m, type = 'dynamic', na.rm = TRUE)
+usol_sdid33m_cs <- aggte(usol_sdid33m, type = 'dynamic', na.rm = TRUE)
+usol_sdid44m_cs <- aggte(usol_sdid44m, type = 'dynamic', na.rm = TRUE)
+
+# Viewing results
+
+summary(usol_sdid11m_cs)
+summary(usol_sdid22m_cs)
+summary(usol_sdid33m_cs)
+summary(usol_sdid44m_cs)
+
+ggdid(usol_sdid11m_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities in Urban Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(usol_sdid22m_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities in Urban Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(usol_sdid33m_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities in Urban Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(usol_sdid44m_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities in Urban Counties -') + theme(plot.title = element_text(hjust = 0.5))
+
+# Running the staggered diff-in-diff for wind
+
+uwind_sdid11m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind_sub.u[which(wind_sub.u$Urban == 1),])
+uwind_sdid22m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind_sub.u[which(wind_sub.u$Urban == 1),])
+uwind_sdid33m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind_sub.u[which(wind_sub.u$Urban == 1),])
+uwind_sdid44m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind_sub.u[which(wind_sub.u$Urban == 1),])
+
+uwind_sdid11m_cs <- aggte(uwind_sdid11m, type = 'dynamic', na.rm = TRUE)
+uwind_sdid22m_cs <- aggte(uwind_sdid22m, type = 'dynamic', na.rm = TRUE)
+uwind_sdid33m_cs <- aggte(uwind_sdid33m, type = 'dynamic', na.rm = TRUE)
+uwind_sdid44m_cs <- aggte(uwind_sdid44m, type = 'dynamic', na.rm = TRUE)
+
+# Viewing results
+
+summary(uwind_sdid11m_cs)
+summary(uwind_sdid22m_cs)
+summary(uwind_sdid33m_cs)
+summary(uwind_sdid44m_cs)
+
+ggdid(uwind_sdid11m_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Urban Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(uwind_sdid22m_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Urban Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(uwind_sdid33m_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Urban Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(uwind_sdid44m_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Urban Counties -') + theme(plot.title = element_text(hjust = 0.5))
+
+# Rural counties
+
+# Running the staggered diff-in-diff for solar
+
+rsol_sdid11m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = solar_sub.r[which(solar_sub.r$Urban == 0),])
+rsol_sdid22m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = solar_sub.r[which(solar_sub.r$Urban == 0),])
+rsol_sdid33m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = solar_only[which(solar_sub.r$Urban == 0),])
+rsol_sdid44m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Sol_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = solar_sub.r[which(solar_sub.r$Urban == 0),])
+
+rsol_sdid11m_cs <- aggte(rsol_sdid11m, type = 'dynamic', na.rm = TRUE)
+rsol_sdid22m_cs <- aggte(rsol_sdid22m, type = 'dynamic', na.rm = TRUE)
+rsol_sdid33m_cs <- aggte(rsol_sdid33m, type = 'dynamic', na.rm = TRUE)
+rsol_sdid44m_cs <- aggte(rsol_sdid44m, type = 'dynamic', na.rm = TRUE)
+
+# Viewing results
+
+summary(rsol_sdid11m_cs)
+summary(rsol_sdid22m_cs)
+summary(rsol_sdid33m_cs)
+summary(rsol_sdid44m_cs)
+
+ggdid(rsol_sdid11m_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(rsol_sdid22m_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(rsol_sdid33m_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(rsol_sdid44m_cs, title = 'Average Effect by Length of Exposure\n\n- Solar Facilities in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
+
+# Running the staggered diff-in-diff for wind
+
+rwind_sdid11m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind_sub.r[which(wind_sub.r$Urban == 0),])
+rwind_sdid22m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind_sub.r[which(wind_sub.r$Urban == 0),])
+rwind_sdid33m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, clustervars = 'ID', data = wind_sub.r[which(wind_sub.r$Urban == 0),])
+rwind_sdid44m <- att_gt(yname = 'LogPop', tname = 'Time', idname = 'ID', gname = 'Wind_Treat_Time', anticipation = 1, xformla = ~ LogLag + Income + Unemployment + HS + BS, control_group = 'notyettreated', clustervars = 'ID', data = wind_sub.r[which(wind_sub.r$Urban == 0),])
+
+rwind_sdid11m_cs <- aggte(rwind_sdid11m, type = 'dynamic', na.rm = TRUE)
+rwind_sdid22m_cs <- aggte(rwind_sdid22m, type = 'dynamic', na.rm = TRUE)
+rwind_sdid33m_cs <- aggte(rwind_sdid33m, type = 'dynamic', na.rm = TRUE)
+rwind_sdid44m_cs <- aggte(rwind_sdid44m, type = 'dynamic', na.rm = TRUE)
+
+# Viewing results
+
+summary(rwind_sdid11m_cs)
+summary(rwind_sdid22m_cs)
+summary(rwind_sdid33m_cs)
+summary(rwind_sdid44m_cs)
+
+ggdid(rwind_sdid11m_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(rwind_sdid22m_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5)) + ylim(c(-.1, .1))
+ggdid(rwind_sdid33m_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
+ggdid(rwind_sdid44m_cs, title = 'Average Effect by Length of Exposure\n\n- Wind Turbines in Rural Counties -') + theme(plot.title = element_text(hjust = 0.5))
+
+# Saving truncated results
+
+atandt <- rbind(c(wind_sdid111_cs$overall.att, wind_sdid222_cs$overall.att, wind_sdid333_cs$overall.att, wind_sdid444_cs$overall.att),
+                c(sol_sdid111_cs$overall.att, sol_sdid222_cs$overall.att, sol_sdid333_cs$overall.att, sol_sdid444_cs$overall.att),
+                c(rwind_sdid11_cs$overall.att, rwind_sdid22_cs$overall.att, rwind_sdid33_cs$overall.att, rwind_sdid44_cs$overall.att),
+                c(rsol_sdid11_cs$overall.att, rsol_sdid22_cs$overall.att, rsol_sdid33_cs$overall.att, rsol_sdid44_cs$overall.att),
+                c(uwind_sdid11_cs$overall.att, uwind_sdid22_cs$overall.att, uwind_sdid33_cs$overall.att, uwind_sdid44_cs$overall.att),
+                c(usol_sdid11_cs$overall.att, usol_sdid22_cs$overall.att, usol_sdid33_cs$overall.att, usol_sdid44_cs$overall.att))
+
+serrs <- rbind(c(wind_sdid111_cs$overall.se, wind_sdid222_cs$overall.se, wind_sdid333_cs$overall.se, wind_sdid444_cs$overall.se),
+               c(sol_sdid111_cs$overall.se, sol_sdid222_cs$overall.se, sol_sdid333_cs$overall.se, sol_sdid444_cs$overall.se),
+               c(rwind_sdid11_cs$overall.se, rwind_sdid22_cs$overall.se, rwind_sdid33_cs$overall.se, rwind_sdid44_cs$overall.se),
+               c(rsol_sdid11_cs$overall.se, rsol_sdid22_cs$overall.se, rsol_sdid33_cs$overall.se, rsol_sdid44_cs$overall.se),
+               c(uwind_sdid11_cs$overall.se, uwind_sdid22_cs$overall.se, uwind_sdid33_cs$overall.se, uwind_sdid44_cs$overall.se),
+               c(usol_sdid11_cs$overall.se, usol_sdid22_cs$overall.se, usol_sdid33_cs$overall.se, usol_sdid44_cs$overall.se))
+
+t.stats <- atandt / serrs
+
+p.10 <- matrix(as.integer(abs(t.stats) > 1.645), 6, 4)
+p.05 <- matrix(as.integer(abs(t.stats) > 1.960), 6, 4)
+p.01 <- matrix(as.integer(abs(t.stats) > 2.576), 6, 4)
+
+stars <- matrix(0, 6, 4)
+
+for (i in 1:6) {
+  
+  for (j in 1:4) {
+    
+    if (p.01[i,j] == 1) {
+      
+      stars[i,j] <- 3
+      
+    } else if (p.05[i,j] == 1) {
+      
+      stars[i,j] <- 2
+      
+    } else if (p.10[i,j] == 1) {
+      
+      stars[i,j] <- 1
+      
+    }
+    
+  }
+  
+}
+
+atandt <- round(atandt, 3)
+serrs <- round(serrs, 3)
+
+write.csv(atandt, paste0(direc, 'results/truncated_coefs.txt'), row.names = FALSE)
+write.csv(serrs, paste0(direc, 'results/truncated_serrs.txt'), row.names = FALSE)
+write.csv(stars, paste0(direc, 'results/truncated_stars.txt'), row.names = FALSE)
+
+# Saving matched results
+
+atandt <- rbind(c(wind_sdid111m_cs$overall.att, wind_sdid222m_cs$overall.att, wind_sdid333m_cs$overall.att, wind_sdid444m_cs$overall.att),
+                c(sol_sdid111m_cs$overall.att, sol_sdid222m_cs$overall.att, sol_sdid333m_cs$overall.att, sol_sdid444m_cs$overall.att),
+                c(rwind_sdid11m_cs$overall.att, rwind_sdid22m_cs$overall.att, rwind_sdid33m_cs$overall.att, rwind_sdid44m_cs$overall.att),
+                c(rsol_sdid11m_cs$overall.att, rsol_sdid22m_cs$overall.att, rsol_sdid33m_cs$overall.att, rsol_sdid44m_cs$overall.att),
+                c(uwind_sdid11m_cs$overall.att, uwind_sdid22m_cs$overall.att, uwind_sdid33m_cs$overall.att, uwind_sdid44m_cs$overall.att),
+                c(usol_sdid11m_cs$overall.att, usol_sdid22m_cs$overall.att, usol_sdid33m_cs$overall.att, usol_sdid44m_cs$overall.att))
+
+serrs <- rbind(c(wind_sdid111m_cs$overall.se, wind_sdid222m_cs$overall.se, wind_sdid333m_cs$overall.se, wind_sdid444m_cs$overall.se),
+               c(sol_sdid111m_cs$overall.se, sol_sdid222m_cs$overall.se, sol_sdid333m_cs$overall.se, sol_sdid444m_cs$overall.se),
+               c(rwind_sdid11m_cs$overall.se, rwind_sdid22m_cs$overall.se, rwind_sdid33m_cs$overall.se, rwind_sdid44m_cs$overall.se),
+               c(rsol_sdid11m_cs$overall.se, rsol_sdid22m_cs$overall.se, rsol_sdid33m_cs$overall.se, rsol_sdid44m_cs$overall.se),
+               c(uwind_sdid11m_cs$overall.se, uwind_sdid22m_cs$overall.se, uwind_sdid33m_cs$overall.se, uwind_sdid44m_cs$overall.se),
+               c(usol_sdid11m_cs$overall.se, usol_sdid22m_cs$overall.se, usol_sdid33m_cs$overall.se, usol_sdid44m_cs$overall.se))
+
+t.stats <- atandt / serrs
+
+p.10 <- matrix(as.integer(abs(t.stats) > 1.645), 6, 4)
+p.05 <- matrix(as.integer(abs(t.stats) > 1.960), 6, 4)
+p.01 <- matrix(as.integer(abs(t.stats) > 2.576), 6, 4)
+
+stars <- matrix(0, 6, 4)
+
+for (i in 1:6) {
+  
+  for (j in 1:4) {
+    
+    if (p.01[i,j] == 1) {
+      
+      stars[i,j] <- 3
+      
+    } else if (p.05[i,j] == 1) {
+      
+      stars[i,j] <- 2
+      
+    } else if (p.10[i,j] == 1) {
+      
+      stars[i,j] <- 1
+      
+    }
+    
+  }
+  
+}
+
+atandt <- round(atandt, 3)
+serrs <- round(serrs, 3)
+
+write.csv(atandt, paste0(direc, 'results/matched_coefs.txt'), row.names = FALSE)
+write.csv(serrs, paste0(direc, 'results/matched_serrs.txt'), row.names = FALSE)
+write.csv(stars, paste0(direc, 'results/matched_stars.txt'), row.names = FALSE)
+
+# Population change figures
+
+cons <- counties()
+
+cons <- cons %>% filter(! STATEFP %in% c('02', '15', '72', '60', '66', '69', '78'))
+
+change <- c()
+
+for (f in unique(acs.data$FIPS)) {
+  
+  print(f)
+  tmp <- acs.data %>% filter(FIPS == f)
+  ling <- (tmp[which(tmp$Year == 2023),]$Population[1] - tmp[which(tmp$Year == 2010),]$Population[1]) / tmp[which(tmp$Year == 2010),]$Population[1]
+  change <- c(change, ling)
+  
+}
+
+fig.df <- as.data.frame(cbind(unique(acs.data$FIPS), change))
+colnames(fig.df) <- c('FIPS', 'Change')
+cons$FIPS <- as.integer(cons$GEOID)
+cons <- left_join(cons, fig.df, by = 'FIPS')
+
+national.mean <- mean(cons$Change, na.rm = TRUE)
+cons$Relative <- as.integer(cons$Change < national.mean)
+
+quail <- acs.data[which(acs.data$Year == 2023),c('FIPS', 'Treated_Solar', 'Treated_Wind')]
+
+cons <- left_join(cons, quail, by = 'FIPS')
+cons$Wind_Group <- (cons$Relative * cons$Treated_Wind) + cons$Treated_Wind
+cons$Solar_Group <- (cons$Relative * cons$Treated_Wind) + cons$Treated_Solar
+cons[is.na(cons)] <- 0
+cons$Wind_Group <- cons$Wind_Group + 1
+cons$Solar_Group <- cons$Solar_Group + 1
+
+wvalues <- c('No Wind Turbines', 'Above US Average', 'Below US Average')
+svalues <- c('No Solar Facilites', 'Above US Average', 'Below US Average')
+
+cons$Wind_Group2 <- wvalues[cons$Wind_Group]
+cons$Solar_Group2 <- svalues[cons$Solar_Group]
+
+wpal <- colorFactor(palette = c('orange2', 'red4', 'white'), domain = sort(unique(cons$Wind_Group2)))
+spal <- colorFactor(palette = c('orange2', 'red4', 'white'), domain = sort(unique(cons$Solar_Group2)))
+
+leaflet(cons$geometry) %>% addTiles() %>% addPolygons(weight = 1.0, smoothFactor = 1.0, opacity = 1.0, fillOpacity = 1.0, color = 'gray', fillColor = wpal(cons$Wind_Group2)) %>% addLegend(position = 'bottomright', pal = wpal, values = cons$Wind_Group2, title = 'Legend')
+
+leaflet(cons$geometry) %>% addTiles() %>% addPolygons(weight = 1.0, smoothFactor = 1.0, opacity = 1.0, fillOpacity = 1.0, color = 'gray', fillColor = spal(cons$Solar_Group2)) %>% addLegend(position = 'bottomright', pal = spal, values = cons$Solar_Group2, title = 'Legend')
 
