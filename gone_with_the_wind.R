@@ -2,7 +2,7 @@
 
 # Making sure requisite libraries are installed
 
-list.of.packages <- c('modelsummary', 'ttidycensus', 'panelView', 'stargazer', 'sandwich', 'viridis',
+list.of.packages <- c('modelsummary', 'tidycensus', 'panelView', 'stargazer', 'sandwich', 'viridis',
                       'leaflet', 'ggplot2', 'tigris', 'lmtest', 'dplyr', 'DRDID', 'did', 'sf')
 
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,'Package'])]
@@ -1719,4 +1719,5 @@ spal <- colorFactor(palette = c('orange2', 'red4', 'white'), domain = sort(uniqu
 leaflet(cons$geometry) %>% addTiles() %>% addPolygons(weight = 1.0, smoothFactor = 1.0, opacity = 1.0, fillOpacity = 1.0, color = 'gray', fillColor = wpal(cons$Wind_Group2)) %>% addLegend(position = 'bottomright', pal = wpal, values = cons$Wind_Group2, title = 'Legend')
 
 leaflet(cons$geometry) %>% addTiles() %>% addPolygons(weight = 1.0, smoothFactor = 1.0, opacity = 1.0, fillOpacity = 1.0, color = 'gray', fillColor = spal(cons$Solar_Group2)) %>% addLegend(position = 'bottomright', pal = spal, values = cons$Solar_Group2, title = 'Legend')
+
 
