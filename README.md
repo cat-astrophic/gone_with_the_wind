@@ -1,6 +1,6 @@
 ## Gone With the Wind: Renewable Energy Projects and Population Change
 
-This repository is for a paper how renewable energy projects affect population dynamics that was published in [*Energy Economics*](https://www.sciencedirect.com/science/article/abs/pii/S0140988326001829).
+This repository is for a paper on how renewable energy projects affect population dynamics that was published in [*Energy Economics*](https://www.sciencedirect.com/science/article/abs/pii/S0140988326001829).
 
 The figure below is evidence that windmills cause population decline by approximately 2-3% while solar facilities do not induce net population loss.
 
